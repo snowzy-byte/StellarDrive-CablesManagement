@@ -1,0 +1,24 @@
+{
+  "id": "CableManagement_Mod",
+  "name": "Cables Management",
+  "author": "Ghost",
+  "version": "1.0.0",
+  "description": "Cables Management helps organize signal cables, power cables and fluid pipes with cable clips, straight routing, Alt alignment and cable painting. Research costs 6 Iron; each clip costs 1 Iron to build.",
+  "thumbnail": "images/cables-management-thumbnail.png",
+  "images": [
+    "images/cables-management-before-after.png"
+  ],
+  "needs": [
+    "sdmodkit"
+  ],
+  "ai": "ai-assisted",
+  "development": "active",
+  "tags": [
+    "cables",
+    "signal",
+    "power",
+    "pipes",
+    "painting",
+    "organization"
+  ]
+}
