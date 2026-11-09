@@ -8,10 +8,43 @@ using Tools.Build.Model;
 using Tools.Build.SnapDetectors.Model;
 using UnityEngine;
 using System;
+using System.Runtime.CompilerServices;
+using Ships.Cables;
+using Ships.Interface.Model.Parts.Common;
 using Ships.Interface.Settings;
 using Object = UnityEngine.Object;
 
 namespace CablesManagementMod;
+
+public static class CablesManagementSocketPositions
+{
+    private sealed class Anchor
+    {
+        public Vector3 Local;
+    }
+    private static ConditionalWeakTable<SocketObject, Anchor> Anchors = new ConditionalWeakTable<SocketObject, Anchor>();
+
+    public static void Install(HarmonyLib.Harmony harmony)
+    {
+        harmony.Patch(AccessTools.Method(typeof(ConnectionsTracker), "GetSocketPosition"),
+            prefix: new HarmonyMethod(typeof(CablesManagementSocketPositions), nameof(BeforePosition)));
+    }
+
+    internal static void Track(SocketObject socket, Vector3 local)
+    {
+        Anchors.Remove(socket);
+        Anchors.Add(socket, new Anchor { Local = local });
+    }
+
+    private static bool BeforePosition(IPartPlacement placement, SocketObject socketObject, ref Vector3 __result)
+    {
+        if (socketObject == null || !Anchors.TryGetValue(socketObject, out Anchor anchor)) return true;
+        __result = placement.LocalPosition + placement.Rotation * anchor.Local;
+        return false;
+    }
+
+    public static void Remove() => Anchors = new ConditionalWeakTable<SocketObject, Anchor>();
+}
 
 public static class CablesManagementPlacement
 {

@@ -45,6 +45,7 @@ public sealed class CablesManagementMod : MelonMod
         CablesManagementControls.Install(HarmonyInstance);
         CablesManagementProtection.Install(HarmonyInstance);
         CablesManagementResearch.Install(HarmonyInstance);
+        CablesManagementSocketPositions.Install(HarmonyInstance);
         CablesManagementRouting.Install(HarmonyInstance);
         CablesManagementNativeMovement.Install(HarmonyInstance);
         CablesManagementPlacement.Install(HarmonyInstance);
@@ -83,6 +84,7 @@ public sealed class CablesManagementMod : MelonMod
         CablesManagementPicking.Remove();
         CablePaintStore.Clear();
         CablesManagementAlignment.Remove();
+        CablesManagementSocketPositions.Remove();
         CablesManagementKeyTip.Remove();
         CablesManagementResearch.Remove();
         CablesManagementControls.Remove();
@@ -100,7 +102,7 @@ public sealed class CablesManagementMod : MelonMod
     private static void InstallHelpers()
     {
         Assembly assembly = typeof(CustomParts).Assembly;
-        foreach (string name in new[] { "BuildPreview", "GhostSet", "PartLookup", "BuildCost", "IconOverrides", "PartGeometry", "RecycleGuard", "SocketPositions" })
+        foreach (string name in new[] { "BuildPreview", "GhostSet", "PartLookup", "BuildCost", "IconOverrides", "PartGeometry", "RecycleGuard" })
             assembly.GetType("SDModKit.Game." + name)?.GetMethod("Install",
                 BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes, null)?.Invoke(null, null);
     }
@@ -181,6 +183,7 @@ public sealed class CablesManagementMod : MelonMod
         var socket = root.AddComponent<SocketObject>();
         Traverse.Create(socket).Field("id").SetValue(id);
         Traverse.Create(socket).Field("type").SetValue(type);
+        CablesManagementSocketPositions.Track(socket, root.transform.localPosition);
         Traverse.Create(socket).Field("relayedSockets").SetValue(Array.Empty<SocketObject>());
         socket.shouldCreateFluidBufferWhenTouchingAnotherSocket = type == CableType.Fluid;
         socket.visualObject = new GameObject("GuideEndpoint_" + id);

@@ -267,8 +267,8 @@ public static class CablesManagementKeyTip
 
     public static void Install(HarmonyLib.Harmony harmony)
     {
-        harmony.Patch(AccessTools.Method(typeof(ToolKeyTipsUpdater), "GetBuildKeyTips"),
-            postfix: new HarmonyMethod(typeof(CablesManagementKeyTip), nameof(AfterBuildTips)));
+        harmony.Patch(AccessTools.Method(typeof(ToolKeyTipsUpdater), "GenerateTips"),
+            prefix: new HarmonyMethod(typeof(CablesManagementKeyTip), nameof(BeforeGenerate)));
         harmony.Patch(AccessTools.Method(typeof(ToolKeyTipUi), nameof(ToolKeyTipUi.Setup)),
             prefix: new HarmonyMethod(typeof(CablesManagementKeyTip), nameof(BeforeTipSetup)),
             postfix: new HarmonyMethod(typeof(CablesManagementKeyTip), nameof(AfterTipSetup)));
@@ -283,15 +283,16 @@ public static class CablesManagementKeyTip
         return _tip;
     }
 
-    private static void AfterBuildTips(ushort? ____buildToolSelectedPartId, ref ToolKeyTip[] __result)
+    private static void BeforeGenerate(bool ____buildToolIsActive, bool ____menuIsOpened,
+        ushort? ____buildToolSelectedPartId, ref IReadOnlyCollection<ToolKeyTip> toolKeyTips)
     {
-        if (!____buildToolSelectedPartId.HasValue || !CablesManagementMod.IsClip(____buildToolSelectedPartId.Value)) return;
+        if (!____buildToolIsActive || ____menuIsOpened || !____buildToolSelectedPartId.HasValue
+            || !CablesManagementMod.IsClip(____buildToolSelectedPartId.Value)) return;
         ToolKeyTip tip = GetTip();
-        foreach (ToolKeyTip current in __result) if (ReferenceEquals(current, tip)) return;
-        var updated = new ToolKeyTip[__result.Length + 1];
-        Array.Copy(__result, updated, __result.Length);
-        updated[updated.Length - 1] = tip;
-        __result = updated;
+        var updated = new List<ToolKeyTip>(toolKeyTips);
+        foreach (ToolKeyTip current in updated) if (ReferenceEquals(current, tip)) return;
+        updated.Add(tip);
+        toolKeyTips = updated;
     }
 
     private static void BeforeTipSetup(ToolKeyTip toolKeyTip, KeyTipIcon ___icon)
