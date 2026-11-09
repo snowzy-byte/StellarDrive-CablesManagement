@@ -35,9 +35,10 @@ public sealed class CableNameMenu : MonoBehaviour, IClosableMenu
         if (IsOpen) return true;
         _tracker = GameRefs.Service<MenuTracker>();
         if (_tracker == null) return false;
-        IsOpen = true;
-        _tracker.TrackMenu(this);
         ModalInput.Capture();
+        IsOpen = true;
+        try { _tracker.TrackMenu(this); }
+        catch { Dismiss(); throw; }
         return true;
     }
     public void Close() => CableRouteView.CloseEditor();

@@ -25,11 +25,11 @@ using Ships.Interface.Model.State;
 using Ships.Physics.Collision;
 using Object = UnityEngine.Object;
 
-[assembly: MelonInfo(typeof(CablesManagementMod.CablesManagementMod), "Cables Management", "1.0.0", "Ghost", null)]
+[assembly: MelonInfo(typeof(CablesManagementMod.CablesManagementMod), "Cables Management", "1.1.0", "Ghost", null)]
 [assembly: MelonGame("CuriousOwlGames", "StellarDrive")]
 [assembly: MelonPriority(100)]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 namespace CablesManagementMod;
 
