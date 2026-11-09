@@ -25,28 +25,22 @@ public static class CablesManagementPlacement
     }
 
     private static bool BeforeFindSnap(SnapDetectionState state, RaycastHit hit,
-        IPlayerTryPlaceBehindWallProvider ____tryPlaceBehindWallProvider,
         ref Pivot? pivot, ref IPartPlacement partPlacement, ref bool __result)
     {
-        if (state.partSettings == null || !CablesManagementMod.IsClip(state.partSettings.id)) return true;
+        if (state.PartSettings == null || !CablesManagementMod.IsClip(state.PartSettings.id)) return true;
         pivot = null;
         partPlacement = null;
         __result = false;
         IShipPartPlacements grid = hit.collider.GetComponentInParent<IShipPartPlacements>();
         if (grid == null) return false;
         var localHit = grid.ConvertHitToLocalHit(hit);
-        if (!CablesManagementAlignment.Held && ____tryPlaceBehindWallProvider != null && ____tryPlaceBehindWallProvider.TryPlaceBehindWall)
-        {
-            localHit.Normal = -localHit.Normal;
-            localHit.Pos += localHit.Normal * .05f;
-        }
         PartOrientation forward = PartOrientationHelper.SnapAnyOrientation(-localHit.Normal);
 
         Vector3 forwardVector = forward.GetVector3();
         if (Mathf.Abs(forwardVector.x) > .01f && Mathf.Abs(forwardVector.y) > .01f && Mathf.Abs(forwardVector.z) > .01f)
             return false;
         Vector3 normal = -forwardVector;
-        Quaternion desired = grid.ToLocalRotation(state.partRotation);
+        Quaternion desired = grid.ToLocalRotation(state.PartRotation);
         Vector3 up = Vector3.ProjectOnPlane(desired * Vector3.up, normal);
         if (up.sqrMagnitude < .01f) up = Vector3.ProjectOnPlane(desired * Vector3.forward, normal);
         PartOrientation? snappedUp = CablesManagementSurfaceOrientation.SnapUp(up, forward);
@@ -59,7 +53,7 @@ public static class CablesManagementPlacement
             + tangent * (Mathf.Round(Vector3.Dot(localHit.Pos, tangent) * 32f) / 32f)
             + normal * (Vector3.Dot(localHit.Pos, normal) + .002f);
         var placement = new FloatingPartPlacement(coord, forward, snappedUp.Value);
-        if (!grid.IsFloatingPlacementFree(placement, state.partSettings.Bounds)) return false;
+        if (!grid.IsFloatingPlacementFree(placement, state.PartSettings.Bounds, state.IgnoredPart)) return false;
         partPlacement = placement;
         __result = true;
         return false;

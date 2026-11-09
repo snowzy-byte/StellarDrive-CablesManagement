@@ -56,7 +56,7 @@ public static class CablesManagementAlignment
 
     private static void AfterDetection(SnapDetectionState state, ref SnapDetectionResults __result)
     {
-        if (!Held || state.partSettings == null || !CablesManagementMod.IsClip(state.partSettings.id))
+        if (!Held || state.PartSettings == null || !CablesManagementMod.IsClip(state.PartSettings.id))
         {
             Hide();
             return;
@@ -90,7 +90,7 @@ public static class CablesManagementAlignment
             Footprints.Add(new Vector2(size.x * .5f, size.y * .5f));
         }
         var grid = __result.shipPartsProxy;
-        var bounds = state.partSettings.Bounds;
+        var bounds = state.PartSettings.Bounds;
         Vector3 normal = -(placement.Rotation * Vector3.forward);
         if (!CablesManagementAlignmentMath.TryFind(placement.Coord, normal, Guides, (index, point, axis) =>
         {
@@ -99,7 +99,7 @@ public static class CablesManagementAlignment
             if (!up.HasValue || Vector3.Dot(up.Value.GetVector3(), axis.normalized) < .999f) return false;
             candidate.UpOrientation = up.Value;
             candidate.Coord = point;
-            return grid.IsFloatingPlacementFree(candidate, bounds);
+            return grid.IsFloatingPlacementFree(candidate, bounds, state.IgnoredPart);
         }, out CablesManagementAlignmentMath.Match match))
         {
             Hide();
@@ -115,7 +115,7 @@ public static class CablesManagementAlignment
             {
                 FloatingPartPlacement candidate = referencePlacement;
                 candidate.Coord = spaced;
-                if (grid.IsFloatingPlacementFree(candidate, bounds)) match.Position = spaced;
+                if (grid.IsFloatingPlacementFree(candidate, bounds, state.IgnoredPart)) match.Position = spaced;
                 else match.Snapped = false;
             }
             else match.Snapped = false;
@@ -131,7 +131,7 @@ public static class CablesManagementAlignment
         if (!CablesManagementAlignmentMath.TryGetSegment(anchor, match.Position, normal,
             CablesManagementLayout.ChannelHeight + .01f,
             CablesManagementAlignmentMath.OutlineInset(match.Axis, Guides[match.Index].Axis, normal, Footprints[match.Index]),
-            state.partSettings.size.y * .5f,
+            state.PartSettings.size.y * .5f,
             out Vector3 localStart, out Vector3 localEnd))
         {
             Hide();

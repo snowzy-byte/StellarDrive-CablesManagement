@@ -86,7 +86,7 @@ public static class CablesManagementControls
 
     public static bool Held(string name)
     {
-        if (!Application.isFocused || CablesManagementControlsMenu.Rebinding) return false;
+        if (!Application.isFocused || CableRouteView.EditorOpen || CablesManagementControlsMenu.Rebinding) return false;
         InputAction action = Reference(name).action;
         if (action.IsPressed()) return true;
         Keyboard keyboard = Keyboard.current;
@@ -96,7 +96,7 @@ public static class CablesManagementControls
             || name == "PaintRoute" && path == "<Keyboard>/leftShift" && keyboard.rightShiftKey.isPressed;
     }
 
-    public static bool Pressed(string name) => Application.isFocused && !CablesManagementControlsMenu.Rebinding
+    public static bool Pressed(string name) => Application.isFocused && !CableRouteView.EditorOpen && !CablesManagementControlsMenu.Rebinding
         && Reference(name).action.WasPressedThisFrame();
 
     public static string Label(string name)

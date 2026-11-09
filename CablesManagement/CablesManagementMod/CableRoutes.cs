@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using FishNet.Broadcast;
 using SDModKit.Game;
 using Ships.Cables;
@@ -37,13 +38,22 @@ public static class CableRoutes
         return _cachedRoute;
     }
 
-    internal static uint[] FindServer(uint seed)
+    internal static uint[] FindServer(uint seed, bool named = false)
     {
         var cables = GameRefs.Service<CablesServerTracker>();
         var ships = GameRefs.Service<ShipsServerTracker>();
         var connections = GameRefs.Service<ConnectionsServerTracker>();
         return cables == null || ships == null ? Array.Empty<uint>() : Find(seed, cables, ships.TryGetStatefulPart,
-            connections == null ? null : new ConnectionLookup(connections.TryGetSocketPhysicalConnection), false);
+            connections == null ? null : new ConnectionLookup(connections.TryGetSocketPhysicalConnection), false, named);
+    }
+
+    public static uint[] FindNamed(uint seed)
+    {
+        var cables = GameRefs.Service<CablesClientTracker>();
+        var ships = GameRefs.Service<ShipsClientTracker>();
+        var connections = GameRefs.Service<ConnectionsClientTracker>();
+        return cables == null || ships == null ? Array.Empty<uint>() : Find(seed, cables, ships.TryGetStatefulPart,
+            connections == null ? null : new ConnectionLookup(connections.TryGetSocketPhysicalConnection), false, true);
     }
 
     public static uint[] FindTrace(uint seed)
@@ -102,7 +112,7 @@ public static class CableRoutes
         return result;
     }
 
-    private static uint[] Find(uint seed, ICablesProvider cables, PartLookup parts, ConnectionLookup connections, bool trace)
+    private static uint[] Find(uint seed, ICablesProvider cables, PartLookup parts, ConnectionLookup connections, bool trace, bool named = false)
     {
         if (seed == 0 || !cables.TryGetCableState(seed, out CableState first)
             || first.PlugA.IsHeldByPlayer || first.PlugB.IsHeldByPlayer) return Array.Empty<uint>();
@@ -112,26 +122,35 @@ public static class CableRoutes
             if (cables.TryGetCableState(id, out CableState cable) && cable.Type == first.Type
                 && !cable.PlugA.IsHeldByPlayer && !cable.PlugB.IsHeldByPlayer)
             {
-                Continue(cable.PlugA, id, first.Type, cables, parts, connections, trace, next);
-                Continue(cable.PlugB, id, first.Type, cables, parts, connections, trace, next);
+                Continue(cable.PlugA, id, first.Type, cables, parts, connections, trace, next, named);
+                Continue(cable.PlugB, id, first.Type, cables, parts, connections, trace, next, named);
             }
             return next;
         });
     }
 
     private static void Continue(CablePlugSocket plug, uint current, CableType type, ICablesProvider cables,
-        PartLookup parts, ConnectionLookup connections, bool trace, List<uint> next)
+        PartLookup parts, ConnectionLookup connections, bool trace, List<uint> next, bool named)
     {
         if (plug.IsHeldByPlayer) return;
-        HashSet<uint> connected = Resolve(plug.EntityPartSocket, current, type, cables, parts, connections, trace);
+        HashSet<uint> connected = Resolve(plug.EntityPartSocket, current, type, cables, parts, connections, trace, null, named);
         if (!trace && connected.Count > 1) return;
         next.AddRange(connected);
     }
 
-    private static IEnumerable<EntityPartSocket> Outlets(EntityPartSocket entry, PartLookup parts, bool trace)
+    private static IEnumerable<EntityPartSocket> Outlets(EntityPartSocket entry, PartLookup parts, CableType type, bool trace, bool named)
     {
         if (!parts(entry.PartContext, out StatefulPart part)) yield break;
         bool clip = CablesManagementMod.IsClip(part.Settings.id);
+        if (!clip && named)
+        {
+            var sockets = part.Settings.GetSockets();
+            if (!sockets.Any(socket => socket.Id == entry.Socket.SocketId && socket.Type == type)) yield break;
+            foreach (var socket in sockets)
+                if (socket.Type == type && socket.Id != entry.Socket.SocketId)
+                    yield return new EntityPartSocket(entry.EntityId, entry.Socket.PartId, socket.Id);
+            yield break;
+        }
         if (!clip && !trace) yield break;
         var relayed = part.GetRelayedSockets(entry.Socket.SocketId);
         if (relayed == null) yield break;
@@ -143,12 +162,12 @@ public static class CableRoutes
     }
 
     private static HashSet<uint> Resolve(EntityPartSocket entry, uint current, CableType type, ICablesProvider cables,
-        PartLookup parts, ConnectionLookup connections, bool trace, Action<EntityPartSocket, EntityPartSocket> record = null)
+        PartLookup parts, ConnectionLookup connections, bool trace, Action<EntityPartSocket, EntityPartSocket> record = null, bool named = false)
     {
         var result = new HashSet<uint>();
         var visited = new HashSet<EntityPartSocket>();
         var pending = new Queue<EntityPartSocket>();
-        foreach (var outlet in Outlets(entry, parts, trace))
+        foreach (var outlet in Outlets(entry, parts, type, trace, named))
         {
             record?.Invoke(entry, outlet);
             pending.Enqueue(outlet);
@@ -170,7 +189,7 @@ public static class CableRoutes
                 : connection.SocketB == outlet ? connection.SocketA : null;
             if (!other.HasValue || other.Value == outlet) continue;
             record?.Invoke(outlet, other.Value);
-            foreach (var linked in Outlets(other.Value, parts, trace))
+            foreach (var linked in Outlets(other.Value, parts, type, trace, named))
             {
                 record?.Invoke(other.Value, linked);
                 pending.Enqueue(linked);
@@ -200,7 +219,17 @@ public static class CableRoutes
         return result;
     }
 
-    public static string Name(uint cable) => CableNameStore.Get(cable);
+    public static string Name(uint cable)
+    {
+        string name = CableNameStore.Get(cable);
+        if (!string.IsNullOrEmpty(name)) return name;
+        foreach (uint id in FindNamed(cable))
+        {
+            name = CableNameStore.Get(id);
+            if (!string.IsNullOrEmpty(name)) return name;
+        }
+        return string.Empty;
+    }
     public static bool RequestName(uint seed, string name) => CablePaintNetwork.SendName(seed, name);
     public static bool PaintRoute(uint seed, uint? rgb) => CablePaintNetwork.SendRoute(seed, rgb);
     public static void Invalidate()

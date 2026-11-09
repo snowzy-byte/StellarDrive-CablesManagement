@@ -50,7 +50,7 @@ public static class CablesManagementNativeMovement
 
     public static void Install(HarmonyLib.Harmony harmony)
     {
-        harmony.Patch(AccessTools.Method(typeof(LocalLocalPlayerHeldPart), nameof(LocalLocalPlayerHeldPart.Rotate)),
+        harmony.Patch(AccessTools.Method(typeof(LocalPlayerHeldPart), nameof(LocalPlayerHeldPart.Rotate)),
             prefix: new HarmonyMethod(typeof(CablesManagementNativeMovement), nameof(BeforeRotate)));
         harmony.Patch(AccessTools.Method(typeof(ShipInteractionService), "RpcLogic___PlaceHeldPart_ServerRPC___2331514408"),
             prefix: new HarmonyMethod(typeof(CablesManagementNativeMovement), nameof(BeforePlace)),

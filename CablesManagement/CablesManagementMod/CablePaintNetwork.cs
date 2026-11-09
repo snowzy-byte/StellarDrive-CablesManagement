@@ -211,7 +211,7 @@ public static class CablePaintNetwork
     {
         if (command.Name == null || command.Name.Length > CableNameStore.MaximumLength || !CanEdit(player, command.Cable)) return false;
         string name = CableNameStore.Normalize(command.Name);
-        uint[] route = CableRoutes.FindServer(command.Cable);
+        uint[] route = CableRoutes.FindServer(command.Cable, true);
         if (route.Length == 0) return false;
         foreach (uint id in route)
         {

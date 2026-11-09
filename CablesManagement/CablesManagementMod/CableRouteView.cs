@@ -9,6 +9,7 @@ using Players.LocalClient.Controls;
 using Players.LocalClient.Interaction;
 using Players.Services;
 using SDModKit.Game;
+using SDModKit.UI;
 using Ships.Cables;
 using Ships.Cables.VisualObjects;
 using Ships.Interface.Model.Parts;
@@ -31,10 +32,12 @@ public sealed class CableNameMenu : MonoBehaviour, IClosableMenu
     public bool IsOpen { get; private set; }
     public bool Open()
     {
+        if (IsOpen) return true;
         _tracker = GameRefs.Service<MenuTracker>();
         if (_tracker == null) return false;
         IsOpen = true;
         _tracker.TrackMenu(this);
+        ModalInput.Capture();
         return true;
     }
     public void Close() => CableRouteView.CloseEditor();
@@ -42,8 +45,11 @@ public sealed class CableNameMenu : MonoBehaviour, IClosableMenu
     {
         if (!IsOpen) return;
         IsOpen = false;
-        if (_tracker != null) _tracker.UntrackMenu(this);
+        try { if (_tracker != null) _tracker.UntrackMenu(this); }
+        finally { ModalInput.Release(); }
     }
+    private void LateUpdate() { if (IsOpen) ModalInput.Hold(); }
+    private void OnDisable() => Dismiss();
     private void OnDestroy() => Dismiss();
 }
 
@@ -183,7 +189,7 @@ public static class CableRouteView
         ShowTooltip(info);
     }
 
-    private static string RoutingTip(uint cable) => "Clip routing: " + (CableRoutingStore.IsCurved(cable) ? "Curved" : "Straight")
+    private static string RoutingTip(uint cable) => "Cable routing: " + (CableRoutingStore.IsCurved(cable) ? "Curved" : "Straight")
         + "     " + CablesManagementControls.Label("ToggleCurve") + "  Toggle curve";
 
     private static void Trace(uint[] ids, bool preview = false)
@@ -222,7 +228,7 @@ public static class CableRouteView
     {
         var spline = cable.GetSpline();
         var tag = cable.GetComponent<CablesManagementCableTag>();
-        if (tag != null && (tag.A || tag.B) && !tag.Curved)
+        if (tag != null && !tag.Curved)
         {
             Transform root = cable.transform;
             Vector3 a = spline.Item1.Position, b = spline.Item2.Position;

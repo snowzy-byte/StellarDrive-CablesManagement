@@ -83,7 +83,6 @@ public static class CablesManagementRouting
     {
         bool a = IsGuide(data.State.PlugA), b = IsGuide(data.State.PlugB);
         var tag = __instance.gameObject.GetComponent<CablesManagementCableTag>();
-        if (tag == null && !a && !b) return;
         if (tag == null) tag = __instance.gameObject.AddComponent<CablesManagementCableTag>();
         tag.A = a;
         tag.B = b;
@@ -102,7 +101,7 @@ public static class CablesManagementRouting
     private static void AfterGetSpline(CableVisual __instance, ref ValueTuple<SimpleBezier.Knot, SimpleBezier.Knot> __result)
     {
         var tag = __instance.GetComponent<CablesManagementCableTag>();
-        if (tag == null || !tag.A && !tag.B) return;
+        if (tag == null) return;
         Transform root = __instance.transform;
         SimpleBezier.Knot a = __result.Item1, b = __result.Item2;
         if (tag.A) a.Position = root.InverseTransformPoint(__instance.PlugA.position);
@@ -120,7 +119,7 @@ public static class CablesManagementRouting
         MeshFilter[] ___cableMesh, float ___segmentLength, float ___uvScaling, ref Mesh[] ____cableDynamicMesh)
     {
         var tag = __instance.GetComponent<CablesManagementCableTag>();
-        if (tag == null || (!tag.A && !tag.B) || tag.Curved) return true;
+        if (tag == null || tag.Curved) return true;
         var generator = GameRefs.Service<ExtrudableCableMeshGenerator>();
         if (generator == null) return true;
         Transform root = __instance.transform;
@@ -195,7 +194,7 @@ public static class CablesManagementMeshVisibility
     private static bool BeforeUpdate(CableVisual __instance, MeshFilter[] ___cableMesh)
     {
         var tag = __instance.GetComponent<CablesManagementCableTag>();
-        if (tag == null || (!tag.A && !tag.B)) return true;
+        if (tag == null) return true;
 
         var spline = __instance.GetSpline();
 
