@@ -8,8 +8,6 @@ using Players.Interface.Services;
 using Players.LocalClient.Controls;
 using Players.LocalClient.Interaction;
 using Players.Services;
-using SDModKit.Game;
-using SDModKit.UI;
 using Ships.Cables;
 using Ships.Cables.VisualObjects;
 using Ships.Interface.Model.Parts;

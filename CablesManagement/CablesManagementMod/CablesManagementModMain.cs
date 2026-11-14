@@ -5,43 +5,42 @@ using System.Reflection;
 using HarmonyLib;
 using MelonLoader;
 using Players.Interface.Model;
-using SDModKit.Game;
-using Ships.Cables.VisualObjects;
+
 using Ships.Interface.Model;
 using Ships.Interface.Model.Parts;
 using Ships.Interface.Model.Parts.Common;
 using Ships.Interface.Settings;
 using Ships.Parts.Common;
-using Ships.Parts.Common.Model.Reactions;
+
 using UnityEngine;
 using Items.Model;
 using Research;
 using Research.Interface.Model;
 using Research.Interface.Values;
-using SDModKit.Content;
 using System.Collections;
 using Ships;
 using Ships.Interface.Model.State;
 using Ships.Physics.Collision;
-using Object = UnityEngine.Object;
 
-[assembly: MelonInfo(typeof(CablesManagementMod.CablesManagementMod), "Cables Management", "1.1.0", "Ghost", null)]
+
+[assembly: MelonInfo(typeof(CablesManagementMod.CablesManagementMod), "Cables Management", "1.2.0", "Ghost", null)]
 [assembly: MelonGame("CuriousOwlGames", "StellarDrive")]
 [assembly: MelonPriority(100)]
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyVersion("1.2.0.0")]
+[assembly: AssemblyFileVersion("1.2.0.0")]
 
 namespace CablesManagementMod;
 
 public sealed class CablesManagementMod : MelonMod
 {
-    public static readonly ushort[] PartIds = { 8890, 8891, 8892, 8893, 8894, 8895 };
-    public static bool IsClip(ushort id) => id >= 8890 && id <= 8895;
+    public static readonly ushort[] PartIds = { 8890, 8891, 8892, 8893, 8894, 8895, 8896, 8897, 8898 };
+    public static bool IsClip(ushort id) => id >= 8890 && id <= 8898;
+    public static bool IsWallPass(ushort id) => id >= 8896 && id <= 8898;
     public static bool IsCross(ushort id) => id >= 8893 && id <= 8895;
 
     public override void OnInitializeMelon()
     {
-        InstallHelpers();
+        CableParts.Install(HarmonyInstance, LoggerInstance.Warning);
         CablesManagementControls.Install(HarmonyInstance);
         CablesManagementProtection.Install(HarmonyInstance);
         CablesManagementResearch.Install(HarmonyInstance);
@@ -63,19 +62,27 @@ public sealed class CablesManagementMod : MelonMod
         Register(8893, "CablesManagementCrossSignal", "Cables Management - Signal Junction", CableType.Signal);
         Register(8894, "CablesManagementCrossPower", "Cables Management - Power Junction", CableType.Power);
         Register(8895, "CablesManagementCrossPipe", "Cables Management - Pipe Junction", CableType.Fluid);
+        Register(8896, "CablesManagementWallSignal", "Wall Feedthrough - Signal", CableType.Signal);
+        Register(8897, "CablesManagementWallPower", "Wall Feedthrough - Power", CableType.Power);
+        Register(8898, "CablesManagementWallPipe", "Wall Feedthrough - Pipe", CableType.Fluid);
+        CablesManagementRouteBuilder.Install(HarmonyInstance);
     }
 
     public override void OnUpdate()
     {
         CablesManagementControls.Update();
+        CablesManagementRouteBuilder.Update();
         CablesManagementRouting.Update();
         CablesManagementAlignment.Update();
         CablePaintMode.Update();
         CablePaintPanel.Tick();
         CableRouteView.Update();
     }
+    public override void OnGUI() => CablesManagementRouteBuilder.Draw();
+
     public override void OnDeinitializeMelon()
     {
+        CablesManagementRouteBuilder.Remove();
         CableRouteView.Remove();
         CablePaintMode.Remove();
         CablePaintKeyTips.Remove();
@@ -88,28 +95,23 @@ public sealed class CablesManagementMod : MelonMod
         CablesManagementKeyTip.Remove();
         CablesManagementResearch.Remove();
         CablesManagementControls.Remove();
+        ModalInput.ReleaseAll();
+        CableParts.Release();
     }
 
     private static void Register(ushort id, string name, string label, CableType type)
     {
-        CustomParts.Register(new CustomPartDefinition
+        CableParts.Register(new CablePartDefinition
         {
-            Id = id, Name = name, Donor = "SignalSplitter", BuildTab = "Cables Management", BuildRow = IsCross(id) ? 1 : 0, AutoFinish = false,
+            Id = id, Name = name, Donor = "SignalSplitter", BuildRow = IsWallPass(id) ? 2 : IsCross(id) ? 1 : 0,
             Configure = (settings, prefab) => Configure(settings, prefab, label, type)
         });
-    }
-
-    private static void InstallHelpers()
-    {
-        Assembly assembly = typeof(CustomParts).Assembly;
-        foreach (string name in new[] { "BuildPreview", "GhostSet", "PartLookup", "BuildCost", "IconOverrides", "PartGeometry", "RecycleGuard" })
-            assembly.GetType("SDModKit.Game." + name)?.GetMethod("Install",
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes, null)?.Invoke(null, null);
     }
 
     private static void Configure(PartSettings settings, GameObject prefab, string label, CableType type)
     {
         bool cross = IsCross(settings.id);
+        bool wallPass = IsWallPass(settings.id);
         CablesManagementResearch.ConfigureCost(settings);
         SocketObject donor = prefab.GetComponentsInChildren<SocketObject>(true).FirstOrDefault(s => s.Type == CableType.Signal);
         if (donor == null || donor.interactive == null)
@@ -135,14 +137,18 @@ public sealed class CablesManagementMod : MelonMod
         var visual = new GameObject("CablesManagementVisual") { layer = prefab.layer };
         visual.transform.SetParent(prefab.transform, false);
         visual.AddComponent<CablesManagementVisual>();
-        GameObject model = cross ? CablesManagementModel.CreateCross(material) : CablesManagementModel.Create(material, "CablesManagementModel");
+        GameObject model = wallPass ? CablesManagementBulkhead.Create(material) : cross ? CablesManagementModel.CreateCross(material) : CablesManagementModel.Create(material, "CablesManagementModel");
         model.transform.SetParent(visual.transform, false);
-        CablesManagementBadge.Create(visual.transform, material, type, cross);
-        CablesManagementBridge.Create(visual.transform, material, type, cross);
+        if (wallPass) CablesManagementBulkhead.Badges(visual.transform, material, type);
+        else
+        {
+            CablesManagementBadge.Create(visual.transform, material, type, cross);
+            CablesManagementBridge.Create(visual.transform, material, type, cross);
+        }
         foreach (Transform node in visual.GetComponentsInChildren<Transform>(true)) node.gameObject.layer = prefab.layer;
 
         var sockets = new SocketObject[cross ? 4 : 2];
-        for (byte id = 0; id < sockets.Length; id++) sockets[id] = CreateSocket(prefab.transform, id, type, socketLayer, cross);
+        for (byte id = 0; id < sockets.Length; id++) sockets[id] = CreateSocket(prefab.transform, id, type, socketLayer, cross, wallPass);
         foreach (SocketObject socket in sockets)
             Traverse.Create(socket).Field("relayedSockets").SetValue(CablesManagementLayout.RelayedPorts(socket.Id, cross).Select(id => sockets[id]).ToArray());
 
@@ -152,34 +158,39 @@ public sealed class CablesManagementMod : MelonMod
         var pickup = interactions.AddComponent<PartInteraction>();
         Traverse.Create(pickup).Field("interactions").SetValue(pickupLabels);
         Traverse.Create(pickup).Field("detectionDistance").SetValue(pickupDistance);
-        interactions.AddComponent<CablesManagementClipPicking>();
-
-        CablesManagementSocketInteraction.ConfigurePickup(interactions, cross);
+        if (wallPass) CablesManagementBulkhead.Pickup(interactions);
+        else
+        {
+            interactions.AddComponent<CablesManagementClipPicking>();
+            CablesManagementSocketInteraction.ConfigurePickup(interactions, cross);
+        }
 
         settings.fullLabel = label;
-        settings.description = cross
+        settings.description = wallPass
+            ? "Connect a cable on each side of an 8 cm hull panel. Both sockets relay the same line. 1 Iron. 1 kg."
+            : cross
             ? "Four-way cable crossing with two independent paths. Each socket connects only to the opposite socket. Indestructible. 1 kg. 1 Iron."
             : "Indestructible straight-through cable guide. Connect one segment to each end; rotate the clip to guide the route. 1 kg. 1 Iron.";
         settings.localizedDescription = null;
         settings.mass = 1f;
         settings.snappingStyle = SnappingStyle.PreciseOnWall;
-        settings.size = cross ? CablesManagementLayout.CrossBoundsSize : CablesManagementLayout.BoundsSize;
+        settings.size = wallPass ? CablesManagementBulkhead.Bounds.size : cross ? CablesManagementLayout.CrossBoundsSize : CablesManagementLayout.BoundsSize;
         settings.thumbnailRotation = Quaternion.Euler(10f, -25f, 0f);
 
         settings.customCreationClass = null;
         var bounds = prefab.GetComponent<ShipPartBounds>() ?? prefab.AddComponent<ShipPartBounds>();
-        bounds.center = CablesManagementLayout.BoundsCenter;
+        bounds.center = wallPass ? CablesManagementBulkhead.Bounds.center : CablesManagementLayout.BoundsCenter;
         bounds.bounds = settings.size;
         if (settings.GetSockets().Count != sockets.Length || visual.GetComponentsInChildren<Collider>(true).Length != 0)
             throw new InvalidOperationException("Cables Management prefab validation failed.");
     }
 
-    private static SocketObject CreateSocket(Transform parent, byte id, CableType type, int layer, bool cross)
+    private static SocketObject CreateSocket(Transform parent, byte id, CableType type, int layer, bool cross, bool wallPass)
     {
         var root = new GameObject("CablesManagementSocket_" + id) { layer = layer };
         root.transform.SetParent(parent, false);
-        root.transform.localPosition = cross ? CablesManagementLayout.CrossPort(id) : CablesManagementLayout.Port(id);
-        root.transform.localRotation = Quaternion.LookRotation(cross ? CablesManagementLayout.CrossInward(id) : CablesManagementLayout.Inward(id), Vector3.back);
+        root.transform.localPosition = wallPass ? CablesManagementBulkhead.Port(id) : cross ? CablesManagementLayout.CrossPort(id) : CablesManagementLayout.Port(id);
+        root.transform.localRotation = wallPass ? Quaternion.LookRotation(id == 0 ? Vector3.forward : Vector3.back, Vector3.up) : Quaternion.LookRotation(cross ? CablesManagementLayout.CrossInward(id) : CablesManagementLayout.Inward(id), Vector3.back);
         var socket = root.AddComponent<SocketObject>();
         Traverse.Create(socket).Field("id").SetValue(id);
         Traverse.Create(socket).Field("type").SetValue(type);
@@ -227,9 +238,7 @@ public static class CablesManagementResearch
 
     private static ItemInstance[] CreateCost(int quantity)
     {
-        ItemSettings iron = ItemCatalog.ById(ItemsConstants.IronItemId);
-        if (iron == null)
-            iron = Resources.FindObjectsOfTypeAll<ItemSettings>().FirstOrDefault(item => item != null && item.id == ItemsConstants.IronItemId);
+        ItemSettings iron = Resources.FindObjectsOfTypeAll<ItemSettings>().FirstOrDefault(item => item != null && item.id == ItemsConstants.IronItemId);
         if (iron == null)
             throw new InvalidOperationException("Cannot find Iron for the Cables Management cost.");
         return new[] { new ItemInstance(iron, quantity) };
@@ -260,7 +269,7 @@ public static class CablesManagementResearch
         _registering = true;
         try
         {
-            PartSettings[] parts = ClipPartIds.Select(id => CustomParts.Get(id)).ToArray();
+            PartSettings[] parts = ClipPartIds.Select(id => CableParts.Get(id)).ToArray();
             if (parts.Any(part => part == null))
                 return;
             if (list.list.Any(research => research != null && research.id == ResearchId))
@@ -294,7 +303,6 @@ public static class CablesManagementResearch
             research.exclusiveToDemo = false;
             list.list.Add(research);
             Registered[list] = research;
-            ResearchLayout.Settle(list);
         }
         finally
         {

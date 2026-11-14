@@ -4,7 +4,6 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Ships.Interface.Model.Parts;
-using SDModKit.Game;
 using Ships.Cables;
 using Ships.Interface.Model.Parts.Common;
 using Ships.Parts.Common;
@@ -17,7 +16,7 @@ using Players.LocalClient.Interaction;
 using Players.LocalClient.Interaction.Filters;
 using Players.Services;
 using WorldTracking.Interface.Values;
-using Object = UnityEngine.Object;
+
 
 namespace CablesManagementMod;
 
@@ -59,12 +58,14 @@ public static class CablesManagementModel
         }
     }
 
-    public static GameObject CreateCross(Material donor)
+    public static GameObject CreateCross(Material donor) => CreatePieces(CablesManagementJunctionShape.Build(), donor, "CablesManagementJunctionModel");
+
+    internal static GameObject CreatePieces(IEnumerable<CablesManagementObj.Piece> pieces, Material donor, string name)
     {
-        var root = new GameObject("CablesManagementJunctionModel");
+        var root = new GameObject(name);
         try
         {
-            foreach (var piece in CablesManagementJunctionShape.Build())
+            foreach (var piece in pieces)
             {
                 var child = new GameObject(piece.Name);
                 child.transform.SetParent(root.transform, false);
@@ -488,10 +489,9 @@ public static class CablesManagementSocketInteraction
 
         target.tag = "Interactable";
         target.AddComponent<SocketInteractionObject>().cableType = type;
-        var box = target.AddComponent<BoxCollider>();
-
-        box.center = cross ? new Vector3(0f, .025f, -.005f * CablesManagementLayout.CrossScale) : new Vector3(0f, .025f, -.007f);
-        box.size = cross ? new Vector3(.065f * CablesManagementLayout.CrossScale, .12f, .045f * CablesManagementLayout.CrossScale) : new Vector3(.07f, .08f, .07f);
+        var sphere = target.AddComponent<SphereCollider>();
+        sphere.center = cross ? new Vector3(0f, .025f, -.005f * CablesManagementLayout.CrossScale) : new Vector3(0f, .025f, -.011f);
+        sphere.radius = cross ? .06f : .044f;
     }
 
     public static void ConfigurePickup(GameObject target, bool cross)

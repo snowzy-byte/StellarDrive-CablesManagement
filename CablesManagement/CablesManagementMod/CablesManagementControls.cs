@@ -4,7 +4,6 @@ using System.Collections;
 using HarmonyLib;
 using Players.LocalClient.Controls.Rebinding;
 using UI.Common;
-using SDModKit.Game;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Players.Interface.Services;
@@ -12,7 +11,7 @@ using Players.LocalClient.Controls;
 using TMPro;
 using UI.Options;
 using UnityEngine.UI;
-using Object = UnityEngine.Object;
+
 
 namespace CablesManagementMod;
 
@@ -21,8 +20,8 @@ public static class CablesManagementControls
     private const string Preference = "CablesManagement_KeybindOverrides";
     private static InputActionAsset _asset;
     private static readonly Dictionary<string, InputActionReference> References = new Dictionary<string, InputActionReference>();
-    public static readonly string[] Names = { "Align", "Palette", "Trace", "Rename", "PaintRoute", "ToggleCurve" };
-    public static readonly string[] Labels = { "Align clips", "Cable colors", "Trace cable route", "Rename cable route", "Paint route modifier", "Toggle cable curve" };
+    public static readonly string[] Names = { "Align", "Palette", "Trace", "Rename", "PaintRoute", "ToggleCurve", "PlanRoute" };
+    public static readonly string[] Labels = { "Align clips", "Cable colors", "Trace cable route", "Rename cable route", "Paint route modifier", "Toggle cable curve", "Plan cable route" };
     public static bool MenuOpen
     {
         get
@@ -38,6 +37,7 @@ public static class CablesManagementControls
             {""name"":""Trace"",""type"":""Button"",""id"":""bb6ef445-f8d2-4bbd-bbad-1abbca34d183"",""expectedControlType"":""Button""},
             {""name"":""Rename"",""type"":""Button"",""id"":""bb6ef445-f8d2-4bbd-bbad-1abbca34d184"",""expectedControlType"":""Button""},
             {""name"":""PaintRoute"",""type"":""Button"",""id"":""bb6ef445-f8d2-4bbd-bbad-1abbca34d185"",""expectedControlType"":""Button""},
+            {""name"":""PlanRoute"",""type"":""Button"",""id"":""bb6ef445-f8d2-4bbd-bbad-1abbca34d187"",""expectedControlType"":""Button""},
             {""name"":""ToggleCurve"",""type"":""Button"",""id"":""bb6ef445-f8d2-4bbd-bbad-1abbca34d186"",""expectedControlType"":""Button""}],
         ""bindings"": [
             {""id"":""bb6ef445-f8d2-4bbd-bbad-1abbca34d191"",""path"":""<Keyboard>/leftAlt"",""action"":""Align""},
@@ -45,6 +45,7 @@ public static class CablesManagementControls
             {""id"":""bb6ef445-f8d2-4bbd-bbad-1abbca34d193"",""path"":""<Keyboard>/h"",""action"":""Trace""},
             {""id"":""bb6ef445-f8d2-4bbd-bbad-1abbca34d194"",""path"":""<Keyboard>/n"",""action"":""Rename""},
             {""id"":""bb6ef445-f8d2-4bbd-bbad-1abbca34d195"",""path"":""<Keyboard>/leftShift"",""action"":""PaintRoute""},
+            {""id"":""bb6ef445-f8d2-4bbd-bbad-1abbca34d197"",""path"":""<Keyboard>/f7"",""action"":""PlanRoute""},
             {""id"":""bb6ef445-f8d2-4bbd-bbad-1abbca34d196"",""path"":""<Keyboard>/f6"",""action"":""ToggleCurve""}]}]}";
 
     public static void Install(HarmonyLib.Harmony harmony)
@@ -86,6 +87,7 @@ public static class CablesManagementControls
 
     public static bool Held(string name)
     {
+        if (CablesManagementRouteBuilder.Active && name != "PlanRoute" && name != "Align") return false;
         if (!Application.isFocused || CableRouteView.EditorOpen || CablesManagementControlsMenu.Rebinding) return false;
         InputAction action = Reference(name).action;
         if (action.IsPressed()) return true;
@@ -96,7 +98,7 @@ public static class CablesManagementControls
             || name == "PaintRoute" && path == "<Keyboard>/leftShift" && keyboard.rightShiftKey.isPressed;
     }
 
-    public static bool Pressed(string name) => Application.isFocused && !CableRouteView.EditorOpen && !CablesManagementControlsMenu.Rebinding
+    public static bool Pressed(string name) => (!CablesManagementRouteBuilder.Active || name == "PlanRoute") && Application.isFocused && !CableRouteView.EditorOpen && !CablesManagementControlsMenu.Rebinding
         && Reference(name).action.WasPressedThisFrame();
 
     public static string Label(string name)
@@ -148,8 +150,8 @@ public sealed class CablesManagementControlsSection : MonoBehaviour
 
 public static class CablesManagementControlsMenu
 {
-    private static readonly string[] Actions = { "Align", "Palette", "Trace", "Rename", "PaintRoute", "ToggleCurve" };
-    private static readonly string[] Labels = { "Align clips", "Cable colors", "Trace cable route", "Rename cable route", "Paint route modifier", "Toggle cable curve" };
+    private static readonly string[] Actions = { "Align", "Palette", "Trace", "Rename", "PaintRoute", "ToggleCurve", "PlanRoute" };
+    private static readonly string[] Labels = { "Align clips", "Cable colors", "Trace cable route", "Rename cable route", "Paint route modifier", "Toggle cable curve", "Plan cable route" };
     private static readonly Dictionary<Transform, GameObject> Sections = new Dictionary<Transform, GameObject>();
     private static InputActionRebindingExtensions.RebindingOperation _operation;
     private static CablesManagementControlRow _currentRow;
@@ -182,7 +184,7 @@ public static class CablesManagementControlsMenu
         ScrollRect scroll = row.GetComponentInParent<ScrollRect>();
         if (scroll != null && scroll.content != null && row.IsChildOf(scroll.content)) host = scroll.content;
         if (Sections.TryGetValue(host, out GameObject existing) && existing != null) return;
-        Build(host, row, sourceLabel);
+        Build(host, row);
     }
 
     private static Transform FindRow(ControlKeybindInput control, out TMP_Text label)
@@ -205,16 +207,20 @@ public static class CablesManagementControlsMenu
         return best;
     }
 
-    private static void Build(Transform host, Transform template, TMP_Text sourceLabel)
+    private static void Build(Transform host, Transform template)
     {
         var sourceRect = template as RectTransform;
-        if (sourceRect == null) return;
+        var nativeLayout = host.GetComponent<VerticalLayoutGroup>();
+        Transform heading = FindHeader(host);
+        if (sourceRect == null || nativeLayout == null || heading == null) return;
         float rowHeight = Mathf.Max(36f, sourceRect.rect.height);
-        float height = 40f + Actions.Length * rowHeight;
+        float headingHeight = ((RectTransform)heading).rect.height;
+        float height = headingHeight + Actions.Length * (rowHeight + nativeLayout.spacing);
         var section = new GameObject("CablesManagementControls", typeof(RectTransform));
         section.SetActive(false);
         section.layer = template.gameObject.layer;
         section.transform.SetParent(host, false);
+        section.transform.SetAsFirstSibling();
         var marker = section.AddComponent<CablesManagementControlsSection>();
         marker.Host = host;
         Sections[host] = section;
@@ -228,14 +234,17 @@ public static class CablesManagementControlsMenu
             layout.childControlWidth = true; layout.childControlHeight = true;
             layout.childForceExpandWidth = true; layout.childForceExpandHeight = false;
             layout.childAlignment = TextAnchor.UpperLeft;
+            layout.spacing = nativeLayout.spacing;
             var element = section.AddComponent<LayoutElement>();
             element.minHeight = element.preferredHeight = height;
-            MakeHeader(section.transform, sourceLabel);
+            element.flexibleHeight = 0f;
+            MakeHeader(section.transform, heading, headingHeight);
             for (int i = 0; i < Actions.Length; i++) MakeRow(section.transform, template, Actions[i], Labels[i], rowHeight);
-            if (host.GetComponent<LayoutGroup>() == null) PositionManually(host as RectTransform, rect, height);
             section.SetActive(true);
             LayoutRebuilder.ForceRebuildLayoutImmediate(rect);
-            if (host is RectTransform parentRect) LayoutRebuilder.MarkLayoutForRebuild(parentRect);
+            if (host is RectTransform parentRect) LayoutRebuilder.ForceRebuildLayoutImmediate(parentRect);
+            ScrollRect scroll = host.GetComponentInParent<ScrollRect>();
+            if (scroll != null) { scroll.StopMovement(); scroll.verticalNormalizedPosition = 1f; }
         }
         catch
         {
@@ -246,18 +255,30 @@ public static class CablesManagementControlsMenu
         finally { _building = false; }
     }
 
-    private static void MakeHeader(Transform parent, TMP_Text source)
+    private static Transform FindHeader(Transform host)
     {
-        var root = new GameObject("CablesManagementHeading", typeof(RectTransform));
-        root.layer = parent.gameObject.layer;
-        root.transform.SetParent(parent, false);
-        var label = root.AddComponent<TextMeshProUGUI>();
-        label.font = source.font; label.fontSharedMaterial = source.fontSharedMaterial;
-        label.fontSize = source.fontSize; label.color = source.color;
-        label.fontStyle = source.fontStyle | FontStyles.Bold;
-        label.alignment = TextAlignmentOptions.MidlineLeft; label.extraPadding = true;
-        label.raycastTarget = false; label.text = "Cables Management";
-        var layout = root.AddComponent<LayoutElement>(); layout.minHeight = layout.preferredHeight = 40f;
+        foreach (Transform child in host)
+            if (child.GetComponent<CablesManagementControlsSection>() == null
+                && child.GetComponentInChildren<ControlKeybindInput>(true) == null
+                && child.GetComponentsInChildren<TMP_Text>(true).Length == 1
+                && child.GetComponentInChildren<Image>(true) != null) return child;
+        return null;
+    }
+
+    private static void MakeHeader(Transform parent, Transform source, float height)
+    {
+        GameObject root = UnityEngine.Object.Instantiate(source.gameObject, parent, false);
+        root.name = "CablesManagementHeading";
+        root.SetActive(false);
+        foreach (MonoBehaviour component in root.GetComponentsInChildren<MonoBehaviour>(true))
+            if (component.GetType().FullName == "UnityEngine.Localization.Components.LocalizeStringEvent") component.enabled = false;
+        TMP_Text label = root.GetComponentInChildren<TMP_Text>(true);
+        label.text = "Cables Management";
+        foreach (Graphic graphic in root.GetComponentsInChildren<Graphic>(true)) graphic.raycastTarget = false;
+        var layout = root.GetComponent<LayoutElement>() ?? root.AddComponent<LayoutElement>();
+        layout.minHeight = layout.preferredHeight = height;
+        layout.flexibleHeight = 0f;
+        root.SetActive(true);
     }
 
     private static void MakeRow(Transform parent, Transform template, string action, string label, float height)
@@ -287,21 +308,6 @@ public static class CablesManagementControlsMenu
         element.minHeight = element.preferredHeight = height;
         clone.SetActive(true);
         Refresh(row);
-    }
-
-    private static void PositionManually(RectTransform host, RectTransform section, float height)
-    {
-        if (host == null) return;
-        float bottom = 0;
-        var corners = new Vector3[4];
-        foreach (RectTransform child in host)
-        {
-            if (child == section) continue;
-            child.GetWorldCorners(corners);
-            for (int i = 0; i < corners.Length; i++) bottom = Mathf.Max(bottom, -host.InverseTransformPoint(corners[i]).y + host.rect.yMax);
-        }
-        section.anchoredPosition = new Vector2(0, -bottom - 12f);
-        host.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, Mathf.Max(host.rect.height, bottom + height + 24f));
     }
 
     private static bool BeforeRebinding(ControlKeybindInput __instance)

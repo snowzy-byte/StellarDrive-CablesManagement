@@ -3,7 +3,6 @@ using System.Reflection;
 using System.Collections.Generic;
 using HarmonyLib;
 using Imports.CablesMesh;
-using SDModKit.Game;
 using Ships.Cables.VisualObjects;
 using Ships.Interface.Model.Parts;
 using Ships.Interface.Model.Parts.Common;
@@ -15,7 +14,7 @@ using Ships.Cables;
 using Ships.Interface.Services;
 using Ships.Parts.Common.Model;
 using WorldTracking.Interface.Values;
-using Object = UnityEngine.Object;
+
 using Players.Interface.Model;
 using Players.Services;
 
@@ -300,6 +299,8 @@ public sealed class CablesManagementPicking : MonoBehaviour
     {
         if (!__instance.isActiveAndEnabled || CablesManagementControls.MenuOpen) return;
         if (CablesManagementClipPicking.TrySelect(__instance, cameraPhysics, ____cableLabelTracker)) return;
+        var sockets = GameRefs.Service<Players.Services.PlayerShipSocketHoverTracker>();
+        if (sockets != null && (sockets.CurrentSocket != null || sockets.CurrentPlug != null)) return;
         if (Loaded.Count == 0) return;
         var cables = GameRefs.Service<CablesClientTracker>();
         if (cables == null || ____cableLabelTracker == null) return;

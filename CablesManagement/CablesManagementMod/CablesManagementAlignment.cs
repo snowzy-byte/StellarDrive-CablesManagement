@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using HarmonyLib;
 using MelonLoader;
-using SDModKit.Game;
 using Ships.Interface.Model.Placement;
 using Ships.Interface.Model.Parts.StateTypes;
 using Ships.Interface.Model.State;
@@ -78,7 +77,7 @@ public static class CablesManagementAlignment
         Footprints.Clear();
         foreach (var part in ship.StatefulParts)
         {
-            if (!CablesManagementMod.IsClip(part.Settings.id) || !(part.Placement is FloatingPartPlacement reference)
+            if ((!CablesManagementMod.IsClip(part.Settings.id) || CablesManagementMod.IsWallPass(part.Settings.id)) || !(part.Placement is FloatingPartPlacement reference)
                 || part.State is IPickablePartState held && held.IsHeldByPlayer) continue;
             Quaternion rotation = part.LocalRotation;
             Guides.Add(new CablesManagementAlignmentMath.Guide

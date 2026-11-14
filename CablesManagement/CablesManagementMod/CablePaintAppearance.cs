@@ -3,7 +3,6 @@ using HarmonyLib;
 using Ships.Cables.VisualObjects;
 using Ships.Cables;
 using Ships.Interface.Model.Parts;
-using SDModKit.Game;
 using UnityEngine;
 using UnityEngine.Rendering;
 

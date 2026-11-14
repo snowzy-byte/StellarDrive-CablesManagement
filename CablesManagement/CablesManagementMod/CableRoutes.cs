@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using FishNet.Broadcast;
-using SDModKit.Game;
 using Ships.Cables;
 using Ships.Interface.Model.Parts;
 using Ships.Interface.Model.Parts.Common;

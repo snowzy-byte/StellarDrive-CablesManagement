@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Core.Services;
 using FishNet;
-using FishNet.Broadcast;
+
 using FishNet.Connection;
 using FishNet.Managing;
 using FishNet.Serializing;
@@ -10,7 +10,6 @@ using FishNet.Transporting;
 using HarmonyLib;
 using Players;
 using Players.Interface.Model;
-using SDModKit.Game;
 using Ships.Cables;
 using Ships.Interface.Model.Parts;
 using Ships.Interface.Model.Parts.Common;
@@ -50,7 +49,7 @@ public static class CablePaintNetwork
 
     public static void Update()
     {
-        NetworkManager current = InstanceFinder.NetworkManager;
+        NetworkManager current = NetworkManager.Instances.Count == 0 ? null : InstanceFinder.NetworkManager;
         if (_network != current)
         {
             Unregister();

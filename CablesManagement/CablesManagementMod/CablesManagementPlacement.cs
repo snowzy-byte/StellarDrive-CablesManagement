@@ -1,5 +1,5 @@
 using HarmonyLib;
-using Players.Interface.Services;
+
 using Ships.Interface.Model.Placement;
 using Ships.Interface.Services;
 using Ships.Visuals;
@@ -12,7 +12,6 @@ using System.Runtime.CompilerServices;
 using Ships.Cables;
 using Ships.Interface.Model.Parts.Common;
 using Ships.Interface.Settings;
-using Object = UnityEngine.Object;
 
 namespace CablesManagementMod;
 

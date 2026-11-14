@@ -13,8 +13,7 @@ using Ships.Services;
 using Ships.Cables;
 using Ships.Interface.Model.Parts.Common;
 using Ships.Parts.Common;
-using Players.LocalClient.Interaction;
-using SDModKit.Game;
+
 using UnityEngine;
 
 namespace CablesManagementMod;

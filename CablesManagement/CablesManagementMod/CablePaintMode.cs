@@ -5,7 +5,6 @@ using Players.Interface.Services;
 using Players.LocalClient.Controls;
 using Players.Services;
 using Players.Inventory;
-using SDModKit.Game;
 using Ships.Cables;
 using Ships.Interface.Model.Parts.Common;
 using UI.Common;
